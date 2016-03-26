@@ -79,42 +79,34 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         var appName = this.applicationName;
         var action = this.action;
         var dest = this.destinationRoot();
-        var isfake = this.fake;
         var fs = this.fs;
 
         var generator = this;
 
-        var isWin = this._isOnWindows();
-
         this._make_build_sh_executable();
 
-        if(this.paket) {
-            var bpath;
-            if(this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-                bpath = path.join(this.applicationName, ".paket", "paket.bootstrapper.exe" );
+        var bpath = this._paket_bootstrap_path();
+
+        var bootstrapper = this._execManaged(bpath, [], {});
+
+        bootstrapper.stdout.on('data', function (data) {
+            log(data.toString());
+        });
+
+        bootstrapper.on('close', function (code) {
+            var ppath;
+            var cpath;
+           
+            if(action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
+                ppath = path.join(dest, appName, ".paket", "paket.exe" );
+                cpath = path.join(dest, appName);
             }
             else {
-                bpath = path.join(".paket", "paket.bootstrapper.exe" );
+                ppath = path.join(dest, ".paket", "paket.exe" );
+                cpath = dest;
             }
-            var bootstrapper = this._execManaged(bpath, [], {});
 
-            bootstrapper.stdout.on('data', function (data) {
-                log(data.toString());
-            });
-
-            bootstrapper.on('close', function (code) {
-                var ppath;
-                var cpath;
-                if(action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-                    ppath = path.join(dest, appName, ".paket", "paket.exe" );
-                    cpath = path.join(dest, appName);
-                }
-                else {
-                    ppath = path.join(dest, ".paket", "paket.exe" );
-                    cpath = dest;
-                }
-                try{
-
+            try{
                 log(cpath);
                 var paket = generator._execManaged(ppath, ['convert-from-nuget','-f'], {cwd: cpath});
 
@@ -129,29 +121,19 @@ var FSharpGenerator = yeoman.generators.Base.extend({
                         log(data.toString());
                     });
                     simplifiy.stdout.on('close', function (data) {
-                        if (isfake) {
-                            var addFake = generator._execManaged(ppath, ['add', 'nuget', 'FAKE'], {cwd: cpath});
+                        var addFake = generator._execManaged(ppath, ['add', 'nuget', 'FAKE'], {cwd: cpath});
 
-                            addFake.stdout.on('close', function(data) {
-                                done();
-                            })
-                        }
-                        else {
+                        addFake.stdout.on('close', function(data) {
                             done();
-                        }
+                        })
                     });
                 });
-                }
-                catch(ex)
-                {
-                    log(ex);
-                }
-            });
-        }
-        else
-        {
-            done();
-        }
+            }
+            catch(ex)
+            {
+                log(ex);
+            }
+        });
     },
 
     end: function() {
@@ -174,36 +156,40 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     },
     
     _copy_paket: function() {
-        var bpath;
-            
-            if(this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-                bpath = path.join(this.applicationName, ".paket", "paket.bootstrapper.exe" );
-            }
-            else {
-                bpath = path.join(".paket", "paket.bootstrapper.exe" );
-            }
+        var bpath = this._paket_bootstrap_path();
 
-            var p = path.join(this._getTemplateDirectory(), ".paket", "paket.bootstrapper.exe");
-            
-            this.copy(p, bpath);
+        var p = path.join(this._getTemplateDirectory(), ".paket", "paket.bootstrapper.exe");
+        
+        this.copy(p, bpath);
     },
 
     _copy_fake: function() {
-        if (this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION){
-                var fakeSource = path.join(this._getTemplateDirectory(), ".fake");
-                this._copy(fakeSource, this.applicationName);
-            }
+        if (this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
+            var fakeSource = path.join(this._getTemplateDirectory(), ".fake");
+            this._copy(fakeSource, this.applicationName);
+        }
     },
 
     _make_build_sh_executable: function() {
-        if(this.fake) {
-            var dest = this.destinationRoot();
+        var dest = this.destinationRoot();
 
-            if (!this._isOnWindows()) {
-                var buildShPath = path.join(dest, this.applicationName, 'build.sh');
-                var chmodProc = spawnSync('chmod', ['+x', buildShPath], {cwd: dest});
-            }
+        if (!this._isOnWindows()) {
+            var buildShPath = path.join(dest, this.applicationName, 'build.sh');
+            var chmodProc = spawnSync('chmod', ['+x', buildShPath], {cwd: dest});
         }
+    },
+
+    _paket_bootstrap_path: function() {
+        var bpath;
+        
+        if(this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
+            bpath = path.join(this.applicationName, ".paket", "paket.bootstrapper.exe" );
+        }
+        else {
+            bpath = path.join(".paket", "paket.bootstrapper.exe" );
+        }
+
+        return bpath;
     },
 
     _copy: function(dirPath, targetDirPath){
