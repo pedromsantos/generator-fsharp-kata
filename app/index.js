@@ -21,7 +21,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     ACTION_CREATE_STANDALONE_PROJECT: 1,
     ACTION_ADD_PROJECT_TO_SOLUTION: 2,
     ACTION_CREATE_EMPTY_SOLUTION: 3,
-    ACTION_ADD_REFERENCE_TO_PROJECT: 4,
 
     constructor: function() {
         yeoman.generators.Base.apply(this, arguments);
@@ -63,9 +62,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     },
 
     writing: function() {
-        if (this.action === this.ACTION_ADD_REFERENCE_TO_PROJECT)
-            return;
-
         this._copy_template();
         
         if(this.paket) {
@@ -90,18 +86,7 @@ var FSharpGenerator = yeoman.generators.Base.extend({
 
         var isWin = this._isOnWindows();
 
-        if (action === this.ACTION_ADD_REFERENCE_TO_PROJECT)
-        {
-            this._addReference(done);
-            return;
-        }
-
-        if(this.fake) {
-            if (!this._isOnWindows()) {
-                var buildShPath = path.join(dest, appName, 'build.sh');
-                var chmodProc = spawnSync('chmod', ['+x', buildShPath], {cwd: dest});
-            }
-        }
+        this._make_build_sh_executable();
 
         if(this.paket) {
             var bpath;
@@ -208,6 +193,17 @@ var FSharpGenerator = yeoman.generators.Base.extend({
                 var fakeSource = path.join(this._getTemplateDirectory(), ".fake");
                 this._copy(fakeSource, this.applicationName);
             }
+    },
+
+    _make_build_sh_executable: function() {
+        if(this.fake) {
+            var dest = this.destinationRoot();
+
+            if (!this._isOnWindows()) {
+                var buildShPath = path.join(dest, this.applicationName, 'build.sh');
+                var chmodProc = spawnSync('chmod', ['+x', buildShPath], {cwd: dest});
+            }
+        }
     },
 
     _copy: function(dirPath, targetDirPath){
