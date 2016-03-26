@@ -25,15 +25,18 @@ var FSharpGenerator = yeoman.generators.Base.extend({
 
     constructor: function() {
         yeoman.generators.Base.apply(this, arguments);
+
+        this.templatedata = {};
+
+        var done = this.async();
+        var p = path.join(this.cacheRoot(), "sha")
+        var old = fs.existsSync(p);
+
+        this._getSHA(old, p, done);
     },
 
     init: function() {
         this.log('Welcome to the ' + chalk.red('FSharp kata') + ' generator!');
-        this.templatedata = {};
-        var done = this.async();
-        var p = path.join(this.cacheRoot(), "sha")
-        var old = fs.existsSync(p);
-        this._getSHA(old, p, done);
     },
 
     askFor: function() {
@@ -43,6 +46,7 @@ var FSharpGenerator = yeoman.generators.Base.extend({
             message: 'What\'s the name of your kata?',
             default: this.type
         }];
+
         this.prompt(prompts, function(props) {
             this.action = 1;
             this.templatedata.namespace = props.applicationName;
@@ -62,31 +66,14 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         if (this.action === this.ACTION_ADD_REFERENCE_TO_PROJECT)
             return;
 
-        var log = this.log;
-        var p;
-        if (this.action === this.ACTION_CREATE_EMPTY_SOLUTION){
-            p = path.join(this._getTemplateDirectory(), 'sln')
-        }
-        else {
-            p = path.join(this._getTemplateDirectory(), this.type);
-        }
-        this._copy(p, this.applicationName);
+        this._copy_template();
+        
         if(this.paket) {
-            var bpath;
-            if(this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-                bpath = path.join(this.applicationName, ".paket", "paket.bootstrapper.exe" );
-            }
-            else {
-                bpath = path.join(".paket", "paket.bootstrapper.exe" );
-            }
-            var p = path.join(this._getTemplateDirectory(), ".paket", "paket.bootstrapper.exe");
-            this.copy(p, bpath);
+            this._copy_paket();
         }
+        
         if(this.fake) {
-            if (this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION){
-                var fakeSource = path.join(this._getTemplateDirectory(), ".fake");
-                this._copy(fakeSource, this.applicationName);
-            }
+            this._copy_fake();
         }
     },
 
@@ -186,6 +173,41 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         this.log('\r\n');
         this.log('Your project is now created');
         this.log('\r\n');
+    },
+
+    _copy_template: function() {
+        var p;
+
+        if (this.action === this.ACTION_CREATE_EMPTY_SOLUTION){
+            p = path.join(this._getTemplateDirectory(), 'sln')
+        }
+        else {
+            p = path.join(this._getTemplateDirectory(), this.type);
+        }
+        
+        this._copy(p, this.applicationName);
+    },
+    
+    _copy_paket: function() {
+        var bpath;
+            
+            if(this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
+                bpath = path.join(this.applicationName, ".paket", "paket.bootstrapper.exe" );
+            }
+            else {
+                bpath = path.join(".paket", "paket.bootstrapper.exe" );
+            }
+
+            var p = path.join(this._getTemplateDirectory(), ".paket", "paket.bootstrapper.exe");
+            
+            this.copy(p, bpath);
+    },
+
+    _copy_fake: function() {
+        if (this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION){
+                var fakeSource = path.join(this._getTemplateDirectory(), ".fake");
+                this._copy(fakeSource, this.applicationName);
+            }
     },
 
     _copy: function(dirPath, targetDirPath){
