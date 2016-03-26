@@ -1,0 +1,5 @@
+node_modules/
+temp/
+.paket/paket.exe
+packages
+.project
