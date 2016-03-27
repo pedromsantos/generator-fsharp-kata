@@ -12,6 +12,11 @@ var xmldom = require("xmldom");
 var wrench = require('wrench');
 var _0777 = parseInt('0777', 8);
 
+// Dependencies
+var FsUnit = 'FsUnit ~> 1.3.1';
+var NUnitRunners = 'NUnit.Runners ~> 2.6.4';
+var FAKE = 'FAKE';
+
 var FSharpGenerator = yeoman.generators.Base.extend({
 
     username: 'fsprojects',
@@ -80,7 +85,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         var action = this.action;
         var dest = this.destinationRoot();
         var fs = this.fs;
-
         var generator = this;
 
         this._make_build_sh_executable();
@@ -94,37 +98,51 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         });
 
         bootstrapper.on('close', function (code) {
-            var ppath;
-            var cpath;
+            var paket_path;
+            var dest_path;
            
             if(action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-                ppath = path.join(dest, appName, ".paket", "paket.exe" );
-                cpath = path.join(dest, appName);
+                paket_path = path.join(dest, appName, ".paket", "paket.exe" );
+                dest_path = path.join(dest, appName);
             }
             else {
-                ppath = path.join(dest, ".paket", "paket.exe" );
-                cpath = dest;
+                paket_path = path.join(dest, ".paket", "paket.exe" );
+                dest_path = dest;
             }
 
             try{
-                log(cpath);
-                var paket = generator._execManaged(ppath, ['convert-from-nuget','-f'], {cwd: cpath});
+                log(dest_path);
+
+                var paket = generator._execManaged(paket_path, ['convert-from-nuget','-f'], {cwd: dest_path});
 
                 paket.stdout.on('data', function (data) {
                     log(data.toString());
                 });
 
                 paket.stdout.on('close', function (data) {
-                    var simplifiy = generator._execManaged(ppath, ['simplify'], {cwd: cpath});
+                    var simplifiy = generator._execManaged(paket_path, ['simplify'], {cwd: dest_path});
 
                     simplifiy.stdout.on('data', function (data) {
                         log(data.toString());
                     });
+
                     simplifiy.stdout.on('close', function (data) {
-                        var addFake = generator._execManaged(ppath, ['add', 'nuget', 'FAKE'], {cwd: cpath});
+                        log("Adding FAKE dependency...");
+                        var addFake = generator._execManaged(paket_path, ['add', 'nuget', FAKE], {cwd: dest_path});
 
                         addFake.stdout.on('close', function(data) {
-                            done();
+                            log("Adding FsUnit dependency...");
+                            var addFsUnit = generator._execManaged(paket_path, ['add', 'nuget', FsUnit], {cwd: dest_path});
+
+                            addFsUnit.stdout.on('close', function(data) {
+                                log("Adding Nunit.Runners dependency...");
+                                var addNUnit_Runners = generator._execManaged(paket_path, ['add', 'nuget', NUnitRunners], {cwd: dest_path});
+                                
+                                addNUnit_Runners.stdout.on('close', function(data) {
+                                    generator._addReferences();
+                                    done();
+                                })
+                            })
                         })
                     });
                 });
@@ -281,8 +299,80 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         });
     },
 
+    _addReferences: function(done) {
+        var log = this.log;
+        var projectFile = this._getProjectFile();
+        var fs = this.fs;
+
+        if (projectFile === undefined)
+        {
+            this.log("No project file in local folder found");
+            return;
+        }
+
+        this.log("Project file: " + projectFile);
+
+        var projectFileContent = fs.read(projectFile);
+
+        var domParser = new xmldom.DOMParser();
+
+        var projectXml = domParser.parseFromString(projectFileContent, 'text/xml');
+
+        var projectReferenceItemGroup = this._references_item_group(projectXml);
+
+        projectReferenceItemGroup.appendChild(this._addReference(projectXml, "FsUnit.NUnit", ".\\packages\\FsUnit\\Lib\\FsUnit.NUnit.dll"));
+        projectReferenceItemGroup.appendChild(this._addReference(projectXml, "nunit.framework", ".\\packages\\NUnit\\lib\\nunit.framework.dll"));
+
+        var xmlSerialzier = new xmldom.XMLSerializer()
+        var xml = xmlSerialzier.serializeToString(projectXml);
+
+        log("Please press Y for updating the existing file");
+
+        //log(xml);
+        fs.write(projectFile, xml);
+    },
+
+    _references_item_group: function(projectXml) {
+        var projectReferenceItemGroup;
+        
+        var itemGroupNodes = projectXml.getElementsByTagName("ItemGroup");
+
+        for (var c in itemGroupNodes)
+        {
+            var node = itemGroupNodes[c];
+
+            for (var cc in node.childNodes)
+            {
+                var itemGroupNode = node.childNodes[cc];
+                if (itemGroupNode.nodeName == "Reference")
+                {
+                    projectReferenceItemGroup = node;
+                    break;
+                }
+            }
+        }
+
+        return projectReferenceItemGroup;
+    },
+
+    _addReference: function(projectXml, reference, hintPath) {
+        var referenceNode = projectXml.createElement("Reference");
+        referenceNode.setAttribute("Include", reference);
+
+        var hintPathNode = projectXml.createElement("HintPath");
+        hintPathNode.appendChild(projectXml.createTextNode(hintPath));
+
+        var privateReference = projectXml.createElement("Private");
+        privateReference.appendChild(projectXml.createTextNode("True"));
+
+        referenceNode.appendChild(hintPathNode);
+        referenceNode.appendChild(privateReference);
+
+        return referenceNode;
+    },
+
     _getProjectFile: function() {
-        var dirPath = this.destinationRoot();
+        var dirPath = path.join(this.destinationRoot(),this.applicationName);
         var files = fs.readdirSync(dirPath);
 
         var projectFile;
@@ -292,6 +382,8 @@ var FSharpGenerator = yeoman.generators.Base.extend({
             var f = files[i];
             var fp = path.join(dirPath, f);
 
+            this.log(fp);
+
             if (fp.endsWith(".fsproj"))
             {
                 projectFile = fp;
@@ -299,23 +391,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         }
 
         return projectFile;
-    },
-
-    _getProjectFiles: function() {
-        var result = [];
-        var dirPath = path.join(this.destinationRoot(), "..");
-        var files = wrench.readdirSyncRecursive(dirPath);
-
-        for(var i in files)
-        {
-            var f = files[i];
-            if (f.endsWith(".fsproj"))
-            {
-                result.push(f);
-            }
-        }
-
-        return result;
     },
 });
 
