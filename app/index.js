@@ -1,3 +1,4 @@
+
 'use strict';
 var yeoman = require('yeoman-generator');
 var yosay = require('yosay');
@@ -18,25 +19,14 @@ var NUnitRunners = 'NUnit.Runners ~> 2.6.4';
 var FAKE = 'FAKE';
 
 var FSharpGenerator = yeoman.generators.Base.extend({
-
-    username: 'fsprojects',
-    repo: 'generator-fsharp',
-    branch: 'templates',
-
     ACTION_CREATE_STANDALONE_PROJECT: 1,
     ACTION_ADD_PROJECT_TO_SOLUTION: 2,
     ACTION_CREATE_EMPTY_SOLUTION: 3,
 
     constructor: function() {
         yeoman.generators.Base.apply(this, arguments);
-
         this.templatedata = {};
-
-        var done = this.async();
-        var p = path.join(this.cacheRoot(), "sha")
-        var old = fs.existsSync(p);
-
-        this._getSHA(old, p, done);
+        var done = this.async();    
     },
 
     init: function() {
@@ -139,8 +129,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
                                 var addNUnit_Runners = generator._execManaged(paket_path, ['add', 'nuget', NUnitRunners], {cwd: dest_path});
                                 
                                 addNUnit_Runners.stdout.on('close', function(data) {
-                                    generator._addReferences();
-                                    //generator._change_fake_file();
                                     done();
                                 })
                             })
@@ -165,10 +153,10 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         var p;
 
         if (this.action === this.ACTION_CREATE_EMPTY_SOLUTION){
-            p = path.join(this._getTemplateDirectory(), 'sln')
+            p = path.join(this.templatePath(), 'sln')
         }
         else {
-            p = path.join(this._getTemplateDirectory(), this.type);
+            p = path.join(this.templatePath(), this.type);
         }
         
         this._copy(p, this.applicationName);
@@ -177,14 +165,14 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     _copy_paket: function() {
         var bpath = this._paket_bootstrap_path();
 
-        var p = path.join(this._getTemplateDirectory(), ".paket", "paket.bootstrapper.exe");
+        var p = path.join(this.templatePath(), ".paket", "paket.bootstrapper.exe");
         
         this.copy(p, bpath);
     },
 
     _copy_fake: function() {
         if (this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-            var fakeSource = path.join(this._getTemplateDirectory(), ".fake");
+            var fakeSource = path.join(this.templatePath(), ".fake");
             this._copy(fakeSource, this.applicationName);
         }
     },
@@ -209,159 +197,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         }
 
         return bpath;
-    },
-
-    _addReferences: function(done) {
-        var log = this.log;
-        var projectFile = this._getProjectFile();
-        var fs = this.fs;
-        var generator = this;
-
-        if (projectFile === undefined)
-        {
-            this.log("No project file in local folder found");
-            return;
-        }
-
-        this.log("Adding references to project file: " + projectFile);
-
-        this.fs.copy(projectFile, projectFile, {
-            process: function(content) {
-                var domParser = new xmldom.DOMParser();
-
-                var projectXml = domParser.parseFromString(content.toString('utf8'), 'text/xml');
-
-                var projectReferenceItemGroup = generator._references_item_group(projectXml);
-
-                projectReferenceItemGroup.appendChild(generator._addReference(projectXml, "FsUnit.NUnit", ".\\packages\\FsUnit\\Lib\\FsUnit.NUnit.dll"));
-                projectReferenceItemGroup.appendChild(generator._addReference(projectXml, "nunit.framework", ".\\packages\\NUnit\\lib\\nunit.framework.dll"));
-
-                var xmlSerialzier = new xmldom.XMLSerializer()
-                return xmlSerialzier.serializeToString(projectXml);
-            }
-        });
-    },
-
-    _references_item_group: function(projectXml) {
-        var projectReferenceItemGroup;
-        
-        var itemGroupNodes = projectXml.getElementsByTagName("ItemGroup");
-
-        for (var c in itemGroupNodes)
-        {
-            var node = itemGroupNodes[c];
-
-            for (var cc in node.childNodes)
-            {
-                var itemGroupNode = node.childNodes[cc];
-                if (itemGroupNode.nodeName == "Reference")
-                {
-                    projectReferenceItemGroup = node;
-                    break;
-                }
-            }
-        }
-
-        return projectReferenceItemGroup;
-    },
-
-    _addReference: function(projectXml, reference, hintPath) {
-        var referenceNode = projectXml.createElement("Reference");
-        referenceNode.setAttribute("Include", reference);
-
-        var hintPathNode = projectXml.createElement("HintPath");
-        hintPathNode.appendChild(projectXml.createTextNode(hintPath));
-
-        var privateReference = projectXml.createElement("Private");
-        privateReference.appendChild(projectXml.createTextNode("True"));
-
-        referenceNode.appendChild(hintPathNode);
-        referenceNode.appendChild(privateReference);
-
-        return referenceNode;
-    },
-
-    _change_fake_file: function() {
-        var done = this.async();
-        var build_fsx_contents = 
-'// include Fake libs\
-#r "./packages/FAKE/tools/FakeLib.dll"\
-\
-open Fake\
-\
-// Directories\
-let buildDir  = "./build/"\
-let testDir  = "./test/"\
-\
-// Targets\
-Target "Clean" (fun _ ->\
-    CleanDirs [buildDir]\
-)\
-\
-Target "Build" (fun _ ->\
-    !! "/**/*.fsproj"\
-    |> MSBuildDebug buildDir "Build"\
-    |> Log "AppBuild-Output: "\
-)\
-\
-Target "Test" (fun _ ->\
-    !! "/**/build/' + this.applicationName + '.dll"\
-    |> NUnit (fun p ->\
-        {p with\
-            ToolPath = "./packages/NUnit.Runners/tools"\
-            ToolName = "nunit-console.exe"\
-            DisableShadowCopy = true;\
-            ShowLabels = false;\
-        })\
-)\
-\
-// Build order\
-"Clean"\
-  ==> "Build"\
-  ==> "Test"\
-  \
-// start build\
-RunTargetOrDefault "Test"';
-
-        var fake_file = path.join(this.destinationRoot(),this.applicationName, "build.fsx");
-
-        if (fake_file === undefined)
-        {
-            this.log("No build.fsx file in local folder found");
-            return;
-        }
-
-        this.log("Updating FAKE file...");
-
-        this.fs.copy(fake_file, fake_file, {
-            process: function(content) {
-                return build_fsx_contents;
-            }
-        });
-    },
-
-    _getTemplateDirectory : function() {
-        return path.join(this.cacheRoot(), this.username, this.repo, this.branch);
-    },
-
-    _getProjectFile: function() {
-        var dirPath = path.join(this.destinationRoot(),this.applicationName);
-        var files = fs.readdirSync(dirPath);
-
-        var projectFile;
-
-        for(var i in files)
-        {
-            var f = files[i];
-            var fp = path.join(dirPath, f);
-
-            if (fp.endsWith(".fsproj"))
-            {
-                projectFile = fp;
-            }
-        }
-
-        return projectFile;
     },
 
     _copy: function(dirPath, targetDirPath){
@@ -397,118 +232,6 @@ RunTargetOrDefault "Test"';
     _isOnWindows : function() {
         return /^win/.test(process.platform);
     },
-
-    _getSHA : function(old, p, done) {
-        var log = this.log;
-        var t = this;
-        var checkSHA = this._checkSHA;
-        var options = {
-            url: "https://api.github.com/repos/fsprojects/generator-fsharp/commits?sha=templates",
-            headers: {
-                'User-Agent': 'request'
-            }
-        };
-        request(options, function (error, response, body) {
-            if (!error && response.statusCode == 200) {
-                var sha = JSON.parse(body)[0].sha;
-                checkSHA(t, p, sha, old, done);
-            }
-        });
-    },
-
-    _checkSHA : function (t, p, sha, old, done) {
-        var oldsha = "";
-        if(old) oldsha = fs.readFileSync(p, 'utf8');
-        if(old && sha != oldsha) {
-            t._saveSHA(p, sha, true);
-            t._download(t, done, true)
-        }
-        else if (old && sha == oldsha) {
-            done();
-        }
-        else {
-            t._saveSHA(p, sha, false);
-            t._download(t, done, true);
-        }
-    },
-    
-    _saveSHA : function (p, sha, old) {
-        if (!fs.existsSync(p)){
-            fs.mkdirParentSync(path.dirname(p));
-        }
-
-        if(old){
-            fs.unlinkSync(p);
-        }
-        fs.appendFileSync(p, sha);
-    },
-
-    _download : function(t, done, reload) {
-        t.remote(t.username, t.repo, t.branch, function (err,r) {
-            done();
-        }, reload)
-    },
 });
-
-//Helper functions
-fs.mkdirParent = function(dirPath, mode, callback) {
-  //Call the standard fs.mkdir
-  fs.mkdir(dirPath, mode, function(error) {
-    //When it fail in this way, do the custom steps
-    if (error && error.errno === 34) {
-      //Create all the parents recursively
-      fs.mkdirParent(path.dirname(dirPath), mode, callback);
-      //And then the directory
-      fs.mkdirParent(dirPath, mode, callback);
-    }
-    //Manually run the callback since we used our own callback to do all these
-    callback && callback(error);
-  });
-};
-
-fs.mkdirParentSync = function sync (p, opts, made) {
-    if (!opts || typeof opts !== 'object') {
-        opts = { mode: opts };
-    }
-
-    var mode = opts.mode;
-    var xfs = opts.fs || fs;
-
-    if (mode === undefined) {
-        mode = _0777 & (~process.umask());
-    }
-    if (!made) made = null;
-
-    p = path.resolve(p);
-
-    try {
-        xfs.mkdirSync(p, mode);
-        made = made || p;
-    }
-    catch (err0) {
-        switch (err0.code) {
-            case 'ENOENT' :
-                made = sync(path.dirname(p), opts, made);
-                sync(p, opts, made);
-                break;
-
-            // In the case of any other error, just see if there's a dir
-            // there already.  If so, then hooray!  If not, then something
-            // is borked.
-            default:
-                var stat;
-                try {
-                    stat = xfs.statSync(p);
-                }
-                catch (err1) {
-                    throw err0;
-                }
-                if (!stat.isDirectory()) throw err0;
-                break;
-        }
-    }
-
-    return made;
-};
 
 module.exports = FSharpGenerator;

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!--This file represents the results of running a test suite-->
+<test-results name="/Users/pedros/src/generator-fsharp-kata/Test/build/Test.dll" total="1" errors="0" failures="1" not-run="0" inconclusive="0" ignored="0" skipped="0" invalid="0" date="2016-03-28" time="19:26:56">
+  <environment nunit-version="2.6.4.14350" clr-version="4.0.30319.17020" os-version="Unix 15.4.0.0" platform="Unix" cwd="/Users/pedros/src/generator-fsharp-kata/Test" machine-name="Pedros-MBP.home" user="pedros" user-domain="Pedros-MBP.home" />
+  <culture-info current-culture="en-GB" current-uiculture="en-GB" />
+  <test-suite type="Assembly" name="/Users/pedros/src/generator-fsharp-kata/Test/build/Test.dll" executed="True" result="Failure" success="False" time="0.031" asserts="0">
+    <results>
+      <test-suite type="Namespace" name="Test" executed="True" result="Failure" success="False" time="0.026" asserts="0">
+        <results>
+          <test-suite type="TestFixture" name="TestShould" executed="True" result="Failure" success="False" time="0.026" asserts="0">
+            <results>
+              <test-case name="Test.TestShould.Fail" executed="True" result="Failure" success="False" time="0.020" asserts="1">
+                <failure>
+                  <message><![CDATA[  Expected: True
+  But was:  False
+]]></message>
+                  <stack-trace><![CDATA[at FsUnit.TopLevelOperators.should[a,a] (Microsoft.FSharp.Core.FSharpFunc`2 f, FsUnit.a x, System.Object y) <0x108f27e90 + 0x00222> in <filename unknown>:0
+at Test.TestShould.Fail () <0x108f27e10 + 0x0005c> in <filename unknown>:0
+]]></stack-trace>
+                </failure>
+              </test-case>
+            </results>
+          </test-suite>
+        </results>
+      </test-suite>
+    </results>
+  </test-suite>
+</test-results>

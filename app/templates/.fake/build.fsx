@@ -5,38 +5,34 @@ open Fake
 
 // Directories
 let buildDir  = "./build/"
-let deployDir = "./deploy/"
-
-
-// Filesets
-let appReferences  =
-    !! "/**/*.csproj"
-      ++ "/**/*.fsproj"
-
-// version info
-let version = "0.1"  // or retrieve from CI server
+let testDir  = "./test/"
 
 // Targets
 Target "Clean" (fun _ ->
-    CleanDirs [buildDir; deployDir]
+    CleanDirs [buildDir]
 )
 
 Target "Build" (fun _ ->
-    // compile all projects below src/app/
-    MSBuildDebug buildDir "Build" appReferences
-        |> Log "AppBuild-Output: "
+    !! "/**/*.fsproj"
+    |> MSBuildDebug buildDir "Build" 
+    |> Log "AppBuild-Output: "
 )
 
-Target "Deploy" (fun _ ->
-    !! (buildDir + "/**/*.*")
-        -- "*.zip"
-        |> Zip buildDir (deployDir + "ApplicationName." + version + ".zip")
+Target "Test" (fun _ ->
+    !! "/**/build/<%= namespace %>.dll"
+    |> NUnit (fun p ->
+        {p with
+            ToolPath = "./packages/NUnit.Runners/tools"
+            ToolName = "nunit-console.exe"
+            DisableShadowCopy = true;
+            ShowLabels = false;
+        })
 )
 
 // Build order
 "Clean"
   ==> "Build"
-  ==> "Deploy"
+  ==> "Test"
 
 // start build
-RunTargetOrDefault "Build"
+RunTargetOrDefault "Test"

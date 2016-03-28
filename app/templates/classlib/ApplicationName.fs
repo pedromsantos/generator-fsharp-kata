@@ -1,4 +1,14 @@
 ﻿namespace <%= namespace %>
 
-type <%= namespace %>() = 
-    member this.X = "F#"
+module <%= namespace %>Kata =
+    let ToRoman number = ""
+
+module <%= namespace %>Should =
+    open <%= namespace %>Kata
+    open NUnit.Framework
+    open FsUnit
+    
+    [<Test>]
+    let Fail() = 
+        false
+        |> should equal true
