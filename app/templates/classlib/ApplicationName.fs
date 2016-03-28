@@ -1,7 +1,7 @@
 ﻿namespace <%= namespace %>
 
 module <%= namespace %>Kata =
-    let ToRoman number = ""
+    let Something = ""
 
 module <%= namespace %>Should =
     open <%= namespace %>Kata

@@ -38,22 +38,14 @@ var FSharpKataGenerator = yeoman.generators.Base.extend({
             this.templatedata.paketPath = ".paket"
             this.applicationName = props.applicationName;
             this.type = "classlib";
-            this.paket = true;
-            this.fake = true;
             done();
         }.bind(this));
     },
 
     writing: function() {
         this._copy_template();
-        
-        if(this.paket) {
-            this._copy_paket();
-        }
-        
-        if(this.fake) {
-            this._copy_fake();
-        }
+        this._copy_paket();
+        this._copy_fake();
     },
 
     install: function() {
@@ -154,11 +146,14 @@ var FSharpKataGenerator = yeoman.generators.Base.extend({
 
     _copy: function(dirPath, targetDirPath){
         var files = fs.readdirSync(dirPath);
+        
         for(var i in files)
         {
             var f = files[i];
             var fp = path.join(dirPath, f);
+            
             this.log(f);
+
             if(fs.statSync(fp).isDirectory()) {
                  var newTargetPath = path.join(targetDirPath, f);
                  this._copy(fp, newTargetPath);
