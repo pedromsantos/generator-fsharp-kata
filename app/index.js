@@ -12,9 +12,7 @@ var FsUnit = 'FsUnit ~> 1.3.1';
 var NUnitRunners = 'NUnit.Runners ~> 2.6.4';
 var FAKE = 'FAKE';
 
-var FSharpGenerator = yeoman.generators.Base.extend({
-    ACTION_CREATE_STANDALONE_PROJECT: 1,
-
+var FSharpKataGenerator = yeoman.generators.Base.extend({
     constructor: function() {
         yeoman.generators.Base.apply(this, arguments);
         this.templatedata = {};
@@ -33,7 +31,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         }];
 
         this.prompt(prompts, function(props) {
-            this.action = this.ACTION_CREATE_STANDALONE_PROJECT;
             this.templatedata.namespace = props.applicationName;
             this.templatedata.applicationname = props.applicationName;
             this.templatedata.guid = uuid.v4();
@@ -74,12 +71,9 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         });
 
         bootstrapper.on('close', function (code) {
-            var paket_path;
-            var dest_path;
+            var paket_path = path.join(generator.destinationRoot(), generator.applicationName, ".paket", "paket.exe" );
+            var dest_path = path.join(generator.destinationRoot(), generator.applicationName);
            
-            paket_path = path.join(generator.destinationRoot(), generator.applicationName, ".paket", "paket.exe" );
-            dest_path = path.join(generator.destinationRoot(), generator.applicationName);        
-
             try{
                 generator.log(dest_path);
 
@@ -194,4 +188,4 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     },
 });
 
-module.exports = FSharpGenerator;
+module.exports = FSharpKataGenerator;
