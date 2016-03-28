@@ -7,20 +7,17 @@ var uuid = require('uuid');
 var spawn = require('child_process').spawn;
 var spawnSync = require('child_process').spawnSync;
 
-// Dependencies
+// Hardcoded dependencies hate this
 var FsUnit = 'FsUnit ~> 1.3.1';
 var NUnitRunners = 'NUnit.Runners ~> 2.6.4';
 var FAKE = 'FAKE';
 
 var FSharpGenerator = yeoman.generators.Base.extend({
     ACTION_CREATE_STANDALONE_PROJECT: 1,
-    ACTION_ADD_PROJECT_TO_SOLUTION: 2,
-    ACTION_CREATE_EMPTY_SOLUTION: 3,
 
     constructor: function() {
         yeoman.generators.Base.apply(this, arguments);
         this.templatedata = {};
-        var done = this.async();    
     },
 
     init: function() {
@@ -36,7 +33,7 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         }];
 
         this.prompt(prompts, function(props) {
-            this.action = 1;
+            this.action = this.ACTION_CREATE_STANDALONE_PROJECT;
             this.templatedata.namespace = props.applicationName;
             this.templatedata.applicationname = props.applicationName;
             this.templatedata.guid = uuid.v4();
@@ -63,12 +60,7 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     },
 
     install: function() {
-        var log = this.log
         var done = this.async();
-        var appName = this.applicationName;
-        var action = this.action;
-        var dest = this.destinationRoot();
-        var fs = this.fs;
         var generator = this;
 
         this._make_build_sh_executable();
@@ -78,48 +70,42 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         var bootstrapper = this._execManaged(bpath, [], {});
 
         bootstrapper.stdout.on('data', function (data) {
-            log(data.toString());
+            generator.log(data.toString());
         });
 
         bootstrapper.on('close', function (code) {
             var paket_path;
             var dest_path;
            
-            if(action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-                paket_path = path.join(dest, appName, ".paket", "paket.exe" );
-                dest_path = path.join(dest, appName);
-            }
-            else {
-                paket_path = path.join(dest, ".paket", "paket.exe" );
-                dest_path = dest;
-            }
+            paket_path = path.join(generator.destinationRoot(), generator.applicationName, ".paket", "paket.exe" );
+            dest_path = path.join(generator.destinationRoot(), generator.applicationName);        
 
             try{
-                log(dest_path);
+                generator.log(dest_path);
 
                 var paket = generator._execManaged(paket_path, ['convert-from-nuget','-f'], {cwd: dest_path});
 
                 paket.stdout.on('data', function (data) {
-                    log(data.toString());
+                    generator.log(data.toString());
                 });
 
                 paket.stdout.on('close', function (data) {
                     var simplifiy = generator._execManaged(paket_path, ['simplify'], {cwd: dest_path});
 
                     simplifiy.stdout.on('data', function (data) {
-                        log(data.toString());
+                        generator.log(data.toString());
                     });
 
                     simplifiy.stdout.on('close', function (data) {
-                        log("Adding FAKE dependency...");
+                        generator.log("Adding FAKE dependency...");
                         var addFake = generator._execManaged(paket_path, ['add', 'nuget', FAKE], {cwd: dest_path});
 
                         addFake.stdout.on('close', function(data) {
-                            log("Adding FsUnit dependency...");
+                            generator.log("Adding FsUnit dependency...");
                             var addFsUnit = generator._execManaged(paket_path, ['add', 'nuget', FsUnit], {cwd: dest_path});
 
                             addFsUnit.stdout.on('close', function(data) {
-                                log("Adding Nunit.Runners dependency...");
+                                generator.log("Adding Nunit.Runners dependency...");
                                 var addNUnit_Runners = generator._execManaged(paket_path, ['add', 'nuget', NUnitRunners], {cwd: dest_path});
                                 
                                 addNUnit_Runners.stdout.on('close', function(data) {
@@ -144,15 +130,7 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     },
 
     _copy_template: function() {
-        var p;
-
-        if (this.action === this.ACTION_CREATE_EMPTY_SOLUTION){
-            p = path.join(this.templatePath(), 'sln')
-        }
-        else {
-            p = path.join(this.templatePath(), this.type);
-        }
-        
+        var p = path.join(this.templatePath(), this.type);
         this._copy(p, this.applicationName);
     },
     
@@ -165,10 +143,8 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     },
 
     _copy_fake: function() {
-        if (this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-            var fakeSource = path.join(this.templatePath(), ".fake");
-            this._copy(fakeSource, this.applicationName);
-        }
+        var fakeSource = path.join(this.templatePath(), ".fake");
+        this._copy(fakeSource, this.applicationName);        
     },
 
     _make_build_sh_executable: function() {
@@ -181,20 +157,10 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     },
 
     _paket_bootstrap_path: function() {
-        var bpath;
-        
-        if(this.action !== this.ACTION_ADD_PROJECT_TO_SOLUTION) {
-            bpath = path.join(this.applicationName, ".paket", "paket.bootstrapper.exe" );
-        }
-        else {
-            bpath = path.join(".paket", "paket.bootstrapper.exe" );
-        }
-
-        return bpath;
+        return path.join(this.applicationName, ".paket", "paket.bootstrapper.exe" );
     },
 
     _copy: function(dirPath, targetDirPath){
-
         var files = fs.readdirSync(dirPath);
         for(var i in files)
         {
