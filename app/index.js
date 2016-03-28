@@ -72,19 +72,17 @@ var FSharpKataGenerator = yeoman.generators.Base.extend({
 
         bootstrapper.on('close', function (code) {
             var paket_path = path.join(generator.destinationRoot(), generator.applicationName, ".paket", "paket.exe" );
-            var dest_path = path.join(generator.destinationRoot(), generator.applicationName);
+            var generated_path = path.join(generator.destinationRoot(), generator.applicationName);
            
             try{
-                generator.log(dest_path);
-
-                var paket = generator._execManaged(paket_path, ['convert-from-nuget','-f'], {cwd: dest_path});
+                var paket = generator._execManaged(paket_path, ['convert-from-nuget','-f'], {cwd: generated_path});
 
                 paket.stdout.on('data', function (data) {
                     generator.log(data.toString());
                 });
 
                 paket.stdout.on('close', function (data) {
-                    var simplifiy = generator._execManaged(paket_path, ['simplify'], {cwd: dest_path});
+                    var simplifiy = generator._execManaged(paket_path, ['simplify'], {cwd: generated_path});
 
                     simplifiy.stdout.on('data', function (data) {
                         generator.log(data.toString());
@@ -92,15 +90,15 @@ var FSharpKataGenerator = yeoman.generators.Base.extend({
 
                     simplifiy.stdout.on('close', function (data) {
                         generator.log("Adding FAKE dependency...");
-                        var addFake = generator._execManaged(paket_path, ['add', 'nuget', FAKE], {cwd: dest_path});
+                        var addFake = generator._execManaged(paket_path, ['add', 'nuget', FAKE], {cwd: generated_path});
 
                         addFake.stdout.on('close', function(data) {
                             generator.log("Adding FsUnit dependency...");
-                            var addFsUnit = generator._execManaged(paket_path, ['add', 'nuget', FsUnit], {cwd: dest_path});
+                            var addFsUnit = generator._execManaged(paket_path, ['add', 'nuget', FsUnit], {cwd: generated_path});
 
                             addFsUnit.stdout.on('close', function(data) {
                                 generator.log("Adding Nunit.Runners dependency...");
-                                var addNUnit_Runners = generator._execManaged(paket_path, ['add', 'nuget', NUnitRunners], {cwd: dest_path});
+                                var addNUnit_Runners = generator._execManaged(paket_path, ['add', 'nuget', NUnitRunners], {cwd: generated_path});
                                 
                                 addNUnit_Runners.stdout.on('close', function(data) {
                                     done();
