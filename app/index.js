@@ -211,95 +211,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         return bpath;
     },
 
-    _copy: function(dirPath, targetDirPath){
-
-        var files = fs.readdirSync(dirPath);
-        for(var i in files)
-        {
-            var f = files[i];
-            var fp = path.join(dirPath, f);
-            this.log(f);
-            if(fs.statSync(fp).isDirectory()) {
-                 var newTargetPath = path.join(targetDirPath, f);
-                 this._copy(fp, newTargetPath);
-            }
-            else {
-                var fn = path.join(targetDirPath.replace('ApplicationName', this.applicationName), f.replace('ApplicationName', this.applicationName));
-                this.template(fp,fn, this.templatedata);
-            }
-        }
-    },
-
-     _isOnWindows : function() {
-        return /^win/.test(process.platform);
-    },
-
-    _download : function(t, done, reload) {
-        t.remote(t.username, t.repo, t.branch, function (err,r) {
-            done();
-        }, reload)
-    },
-
-    _getTemplateDirectory : function() {
-        return path.join(this.cacheRoot(), this.username, this.repo, this.branch);
-    },
-
-    _execManaged : function(file, args, options) {
-        if(this._isOnWindows()){
-            return spawn(file, args, options);
-        }
-        else {
-            var monoArgs = [file];
-            monoArgs = monoArgs.concat(args);
-            return spawn('mono', monoArgs, options);
-        }
-    },
-
-    _saveSHA : function (p, sha, old) {
-        if (!fs.existsSync(p)){
-            fs.mkdirParentSync(path.dirname(p));
-        }
-
-        if(old){
-            fs.unlinkSync(p);
-        }
-        fs.appendFileSync(p, sha);
-    },
-
-    _checkSHA : function (t, p, sha, old, done) {
-        var oldsha = "";
-        if(old) oldsha = fs.readFileSync(p, 'utf8');
-        if(old && sha != oldsha) {
-            t._saveSHA(p, sha, true);
-            t._download(t, done, true)
-        }
-        else if (old && sha == oldsha) {
-            done();
-        }
-        else {
-            t._saveSHA(p, sha, false);
-            t._download(t, done, true);
-        }
-    },
-
-    _getSHA : function(old, p, done) {
-        var log = this.log;
-        var t = this;
-        var checkSHA = this._checkSHA;
-        var options = {
-            url: "https://api.github.com/repos/fsprojects/generator-fsharp/commits?sha=templates",
-            headers: {
-                'User-Agent': 'request'
-            }
-        };
-        request(options, function (error, response, body) {
-            if (!error && response.statusCode == 200) {
-                var sha = JSON.parse(body)[0].sha;
-                checkSHA(t, p, sha, old, done);
-            }
-        });
-    },
-
     _addReferences: function(done) {
         var log = this.log;
         var projectFile = this._getProjectFile();
@@ -370,26 +281,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         return referenceNode;
     },
 
-    _getProjectFile: function() {
-        var dirPath = path.join(this.destinationRoot(),this.applicationName);
-        var files = fs.readdirSync(dirPath);
-
-        var projectFile;
-
-        for(var i in files)
-        {
-            var f = files[i];
-            var fp = path.join(dirPath, f);
-
-            if (fp.endsWith(".fsproj"))
-            {
-                projectFile = fp;
-            }
-        }
-
-        return projectFile;
-    },
-
     _change_fake_file: function() {
         var done = this.async();
         var build_fsx_contents = 
@@ -442,11 +333,120 @@ RunTargetOrDefault "Test"';
 
         this.log("Updating FAKE file...");
 
-        this.fs.copy(projectFile, projectFile, {
+        this.fs.copy(fake_file, fake_file, {
             process: function(content) {
                 return build_fsx_contents;
             }
         });
+    },
+
+    _getTemplateDirectory : function() {
+        return path.join(this.cacheRoot(), this.username, this.repo, this.branch);
+    },
+
+    _getProjectFile: function() {
+        var dirPath = path.join(this.destinationRoot(),this.applicationName);
+        var files = fs.readdirSync(dirPath);
+
+        var projectFile;
+
+        for(var i in files)
+        {
+            var f = files[i];
+            var fp = path.join(dirPath, f);
+
+            if (fp.endsWith(".fsproj"))
+            {
+                projectFile = fp;
+            }
+        }
+
+        return projectFile;
+    },
+
+    _copy: function(dirPath, targetDirPath){
+
+        var files = fs.readdirSync(dirPath);
+        for(var i in files)
+        {
+            var f = files[i];
+            var fp = path.join(dirPath, f);
+            this.log(f);
+            if(fs.statSync(fp).isDirectory()) {
+                 var newTargetPath = path.join(targetDirPath, f);
+                 this._copy(fp, newTargetPath);
+            }
+            else {
+                var fn = path.join(targetDirPath.replace('ApplicationName', this.applicationName), f.replace('ApplicationName', this.applicationName));
+                this.template(fp,fn, this.templatedata);
+            }
+        }
+    },
+
+    _execManaged : function(file, args, options) {
+        if(this._isOnWindows()){
+            return spawn(file, args, options);
+        }
+        else {
+            var monoArgs = [file];
+            monoArgs = monoArgs.concat(args);
+            return spawn('mono', monoArgs, options);
+        }
+    },
+
+    _isOnWindows : function() {
+        return /^win/.test(process.platform);
+    },
+
+    _getSHA : function(old, p, done) {
+        var log = this.log;
+        var t = this;
+        var checkSHA = this._checkSHA;
+        var options = {
+            url: "https://api.github.com/repos/fsprojects/generator-fsharp/commits?sha=templates",
+            headers: {
+                'User-Agent': 'request'
+            }
+        };
+        request(options, function (error, response, body) {
+            if (!error && response.statusCode == 200) {
+                var sha = JSON.parse(body)[0].sha;
+                checkSHA(t, p, sha, old, done);
+            }
+        });
+    },
+
+    _checkSHA : function (t, p, sha, old, done) {
+        var oldsha = "";
+        if(old) oldsha = fs.readFileSync(p, 'utf8');
+        if(old && sha != oldsha) {
+            t._saveSHA(p, sha, true);
+            t._download(t, done, true)
+        }
+        else if (old && sha == oldsha) {
+            done();
+        }
+        else {
+            t._saveSHA(p, sha, false);
+            t._download(t, done, true);
+        }
+    },
+    
+    _saveSHA : function (p, sha, old) {
+        if (!fs.existsSync(p)){
+            fs.mkdirParentSync(path.dirname(p));
+        }
+
+        if(old){
+            fs.unlinkSync(p);
+        }
+        fs.appendFileSync(p, sha);
+    },
+
+    _download : function(t, done, reload) {
+        t.remote(t.username, t.repo, t.branch, function (err,r) {
+            done();
+        }, reload)
     },
 });
 
