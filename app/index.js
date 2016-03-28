@@ -140,6 +140,7 @@ var FSharpGenerator = yeoman.generators.Base.extend({
                                 
                                 addNUnit_Runners.stdout.on('close', function(data) {
                                     generator._addReferences();
+                                    //generator._change_fake_file();
                                     done();
                                 })
                             })
@@ -303,6 +304,7 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         var log = this.log;
         var projectFile = this._getProjectFile();
         var fs = this.fs;
+        var generator = this;
 
         if (projectFile === undefined)
         {
@@ -310,26 +312,23 @@ var FSharpGenerator = yeoman.generators.Base.extend({
             return;
         }
 
-        this.log("Project file: " + projectFile);
+        this.log("Adding references to project file: " + projectFile);
 
-        var projectFileContent = fs.read(projectFile);
+        this.fs.copy(projectFile, projectFile, {
+            process: function(content) {
+                var domParser = new xmldom.DOMParser();
 
-        var domParser = new xmldom.DOMParser();
+                var projectXml = domParser.parseFromString(content.toString('utf8'), 'text/xml');
 
-        var projectXml = domParser.parseFromString(projectFileContent, 'text/xml');
+                var projectReferenceItemGroup = generator._references_item_group(projectXml);
 
-        var projectReferenceItemGroup = this._references_item_group(projectXml);
+                projectReferenceItemGroup.appendChild(generator._addReference(projectXml, "FsUnit.NUnit", ".\\packages\\FsUnit\\Lib\\FsUnit.NUnit.dll"));
+                projectReferenceItemGroup.appendChild(generator._addReference(projectXml, "nunit.framework", ".\\packages\\NUnit\\lib\\nunit.framework.dll"));
 
-        projectReferenceItemGroup.appendChild(this._addReference(projectXml, "FsUnit.NUnit", ".\\packages\\FsUnit\\Lib\\FsUnit.NUnit.dll"));
-        projectReferenceItemGroup.appendChild(this._addReference(projectXml, "nunit.framework", ".\\packages\\NUnit\\lib\\nunit.framework.dll"));
-
-        var xmlSerialzier = new xmldom.XMLSerializer()
-        var xml = xmlSerialzier.serializeToString(projectXml);
-
-        log("Please press Y for updating the existing file");
-
-        //log(xml);
-        fs.write(projectFile, xml);
+                var xmlSerialzier = new xmldom.XMLSerializer()
+                return xmlSerialzier.serializeToString(projectXml);
+            }
+        });
     },
 
     _references_item_group: function(projectXml) {
@@ -382,8 +381,6 @@ var FSharpGenerator = yeoman.generators.Base.extend({
             var f = files[i];
             var fp = path.join(dirPath, f);
 
-            this.log(fp);
-
             if (fp.endsWith(".fsproj"))
             {
                 projectFile = fp;
@@ -391,6 +388,65 @@ var FSharpGenerator = yeoman.generators.Base.extend({
         }
 
         return projectFile;
+    },
+
+    _change_fake_file: function() {
+        var done = this.async();
+        var build_fsx_contents = 
+'// include Fake libs\
+#r "./packages/FAKE/tools/FakeLib.dll"\
+\
+open Fake\
+\
+// Directories\
+let buildDir  = "./build/"\
+let testDir  = "./test/"\
+\
+// Targets\
+Target "Clean" (fun _ ->\
+    CleanDirs [buildDir]\
+)\
+\
+Target "Build" (fun _ ->\
+    !! "/**/*.fsproj"\
+    |> MSBuildDebug buildDir "Build"\
+    |> Log "AppBuild-Output: "\
+)\
+\
+Target "Test" (fun _ ->\
+    !! "/**/build/' + this.applicationName + '.dll"\
+    |> NUnit (fun p ->\
+        {p with\
+            ToolPath = "./packages/NUnit.Runners/tools"\
+            ToolName = "nunit-console.exe"\
+            DisableShadowCopy = true;\
+            ShowLabels = false;\
+        })\
+)\
+\
+// Build order\
+"Clean"\
+  ==> "Build"\
+  ==> "Test"\
+  \
+// start build\
+RunTargetOrDefault "Test"';
+
+        var fake_file = path.join(this.destinationRoot(),this.applicationName, "build.fsx");
+
+        if (fake_file === undefined)
+        {
+            this.log("No build.fsx file in local folder found");
+            return;
+        }
+
+        this.log("Updating FAKE file...");
+
+        this.fs.copy(projectFile, projectFile, {
+            process: function(content) {
+                return build_fsx_contents;
+            }
+        });
     },
 });
 
