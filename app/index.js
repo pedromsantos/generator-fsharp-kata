@@ -1,17 +1,11 @@
 
 'use strict';
 var yeoman = require('yeoman-generator');
-var yosay = require('yosay');
-var chalk = require('chalk');
 var path = require('path');
 var fs = require('fs');
 var uuid = require('uuid');
 var spawn = require('child_process').spawn;
 var spawnSync = require('child_process').spawnSync;
-var request = require('request');
-var xmldom = require("xmldom");
-var wrench = require('wrench');
-var _0777 = parseInt('0777', 8);
 
 // Dependencies
 var FsUnit = 'FsUnit ~> 1.3.1';
@@ -30,7 +24,7 @@ var FSharpGenerator = yeoman.generators.Base.extend({
     },
 
     init: function() {
-        this.log('Welcome to the ' + chalk.red('FSharp kata') + ' generator!');
+        this.log('Welcome to the FSharp kata generator!');
     },
 
     askFor: function() {
